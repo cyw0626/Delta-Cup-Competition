@@ -134,3 +134,91 @@ void USART3_Config(u32 bound)
   USART_HalfDuplexCmd(USART3,ENABLE);
   USART_Cmd(USART3, ENABLE); 
 }
+/**************************************************************************
+函数功能：串口发送一个字符、字符串
+入口参数：USART_TypeDef* TUSARTx:可选择对应串口 data:要发送的字符 *str:要发送的字符串
+返回值：无
+**************************************************************************/
+void UART_PutChar(USART_TypeDef* USARTx, uint8_t Data)
+{
+  USART_SendData(USARTx, Data); 
+  while(USART_GetFlagStatus(USARTx, USART_FLAG_TC) == RESET){}
+}
+void UART_PutStr (USART_TypeDef* USARTx, char *str)
+{
+  unsigned int i = 0;
+  while(*str != '\0' && i < 500)
+  {
+    UART_PutChar(USARTx, *str++);
+    i++;
+  }
+}
+/**************************************************************************
+函数功能：将一个无符号整型数转换成对应字符串，在通过串口1发送出去
+入口参数：uint16 data
+返回值：无
+**************************************************************************/
+void UART_Put_Num(uint16  dat)
+{
+  char temp[20]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+  u32tostr(dat,temp);
+  UART_PutStr(USART1,temp); 
+}
+void UART_Put_Inf(char *inf,uint16 dat)
+{
+  UART_PutStr (USART1,inf); 
+  UART_Put_Num(dat);
+  UART_PutStr (USART1,"\n");  
+}
+/**************************************************************************
+函数功能：串口1中断入口函数
+入口参数：无
+返回值：无
+**************************************************************************/
+void USART1_IRQHandler(void)
+{
+  static unsigned int i=0;
+  u8 res;
+  if(USART_GetITStatus(USART,USART_IT_RXNE)!= RESET)
+  {
+    USART_ClearITPendingBit(USART1,USART_IT_RXNE);
+    Res =USART_ReceiveData(USART1);	
+    if(!flag_uart1_rev)
+    {
+      uart1_buf[i]=Res;
+      i++;
+      if(uart1_buf[i-1]=='\n'||i>255)
+      {
+        uart1_buf[i] = 0;
+        flag_uart1_rev=1;
+        i=0;
+      }
+    }
+  }
+}
+void USART3_IRQHandler(void)
+{
+  static char num=0;
+  unsigned char ch=0;
+  if(USART_GetITStatus(USART3, USART_IT_RXNE) != RESET)  
+  { 
+    USART_ClearITPendingBit(USART3,USART_IT_RXNE);
+    ch=USART_ReceiveData(USART3);	
+    if(!flag_uart2_rev)
+    {
+      if(ch=='#')
+      {
+        num=0;
+        uart2_buf[num]=ch;
+      }
+      else if(uart2_buf[num-1]=='\r')
+      {
+        uart2_buf[num]=0;
+        flag_uart2_rev=1;
+        num=0;
+			}
+      uart2_buf[num]=ch;
+      num++;
+    }
+	}
+}
